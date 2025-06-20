@@ -82,7 +82,9 @@ private:
     std::unique_ptr<LLVMContext> owned_ctx;
     std::vector<std::unique_ptr<Module>> owned_modules;
     std::vector<std::reference_wrapper<Module>> modules;
-
+//kbkang-MODIFIED
+    std::unordered_set<std::string> SecretAnnotatedValues;
+//kbkang-MODIFIED
     /// Record some "sse_" function declarations used in other ext function definition, e.g., svf_ext_foo(), and svf_ext_foo() used in app functions
     FunctionSetType ExtFuncsVec;
     /// Record annotations of function in extapi.bc
@@ -113,7 +115,7 @@ private:
     ValueToIDMapTy objSymMap;  ///< map a obj reference to its sym id
     FunToIDMapTy returnSymMap; ///< return map
     FunToIDMapTy varargSymMap; ///< vararg map
-
+			       ///
     FunctionSet funSet;
     FunToExitBBMap funToExitBB;
     FunToRealDefFunMap funToRealDefFun;
@@ -346,7 +348,6 @@ public:
         return b;
     }
 
-
     /// Global to rep
     bool hasGlobalRep(const GlobalVariable* val) const
     {
@@ -395,7 +396,19 @@ public:
     ObjTypeInference* getTypeInference();
 
     DominatorTree& getDomTree(const Function* fun);
+//kbkang-MODIFIED
+    void collectVarAnnotations(const Module* mod);
 
+    const std::unordered_set<std::string>& getSecretValues() const{
+	return SecretAnnotatedValues;
+    }
+
+    std::string trim(const std::string& s) {
+        size_t start = s.find_first_not_of(" \t\n\r");
+        size_t end = s.find_last_not_of(" \t\n\r");
+        return (start == std::string::npos) ? "" : s.substr(start, end - start + 1);
+    }
+//kbkang-MODIFIED
     std::string getExtFuncAnnotation(const Function* fun, const std::string& funcAnnotation);
 
     const std::vector<std::string>& getExtFuncAnnotations(const Function* fun);

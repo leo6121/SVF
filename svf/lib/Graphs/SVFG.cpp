@@ -577,7 +577,12 @@ void SVFG::dump(const std::string& file, bool simple)
 {
     GraphPrinter::WriteGraphToFile(outs(), file, this, simple);
 }
-
+/*
+void SVFG::dump_filtered(const std::string& file, SVFGNode* node)
+{
+    GraphPrinter::WriteGraphFilteredToFile(outs(),file, this, node);
+}
+*/
 /**
  * Get all inter value flow edges at this indirect call site, including call and return edges.
  */

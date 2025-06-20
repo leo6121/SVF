@@ -60,7 +60,21 @@ public:
 
     SVFG* buildPTROnlySVFG(BVDataPTAImpl* pta);
     SVFG* buildFullSVFG(BVDataPTAImpl* pta);
+//kbkang-MODIFIED
+    std::string trim(const std::string& s) {
+	size_t start = s.find_first_not_of(" \t\n\r");
+   	size_t end = s.find_last_not_of(" \t\n\r");
+	return (start == std::string::npos) ? "" : s.substr(start, end - start + 1);
+    }
 
+    void setSecretAnnotatedValues(const std::unordered_set<std::string>& vals){
+	    secretAnnotatedVals = vals;
+    }
+
+    const std::unordered_set<std::string>& getSecretAnnotatedValues() const {
+	    return secretAnnotatedVals;
+    }
+//kbkang-MODIFIED
     /// Get SVFG instance
     inline SVFG* getSVFG() const
     {
@@ -89,7 +103,13 @@ protected:
     virtual void buildSVFG();
     /// Release global SVFG
     virtual void releaseMemory();
+//kbkang-MODIFIED
+    virtual void dumpSubgraphFromNode(SVFGNode* startNode, const std::string& outFile);
 
+    std::unordered_set<std::string> secretAnnotatedVals;
+
+    SVFGNode* targetNode = nullptr;
+//kbkang-MODIFIED
     /// SVFG Edges connected at indirect call/ret sites
     SVFGEdgeSet vfEdgesAtIndCallSite;
     std::unique_ptr<SVFG> svfg;

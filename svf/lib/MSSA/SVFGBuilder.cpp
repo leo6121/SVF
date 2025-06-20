@@ -33,6 +33,7 @@
 #include "Util/Options.h"
 #include "Util/SVFUtil.h"
 #include "WPA/Andersen.h"
+#include "Graphs/GraphWriter.h"
 
 using namespace SVF;
 using namespace SVFUtil;
@@ -48,6 +49,53 @@ SVFG* SVFGBuilder::buildFullSVFG(BVDataPTAImpl* pta)
     return this->SVFGWithPostOpts ? build(pta, VFG::FULLSVFG_OPT)
            : build(pta, VFG::FULLSVFG);
 }
+//kbkang-MODIFIED
+std::string escapeDotString(const std::string& raw) {
+    std::string escaped;
+    for (char c : raw) {
+        switch (c) {
+            case '\"': escaped += "\\\""; break;
+            case '\n': escaped += "\\n"; break;
+            case '\t': escaped += "    "; break; //
+            case '\r': break; 
+            default: escaped += c;
+        }
+    }
+    return escaped;
+}
+
+void SVFGBuilder::dumpSubgraphFromNode(SVFGNode* startNode, const std::string& outFile) {
+    std::set<const SVFGNode*> visited;
+    std::queue<const SVFGNode*> worklist;
+    worklist.push(startNode);
+    visited.insert(startNode);
+    SVFUtil::outs() << "Writing Filtered SVFG graph to .dot ...\n";
+    std::string outFile2 = "value_integrated_file.txt";
+    std::ofstream out(outFile);
+    std::ofstream out2(outFile2);
+    out << "digraph SVFG_Subgraph {\n";
+
+    while (!worklist.empty()) {
+        const SVFGNode* node = worklist.front();
+        worklist.pop();
+
+	out << "  Node" << node->getId() << " [label=\"" << escapeDotString(node->toString()) << "\"];\n";
+	out2 << "  Node" << node->getId() << "\t" << escapeDotString(node->toString()) << "\n";
+
+        for (const SVFGEdge* edge : node->getOutEdges()) {
+            const SVFGNode* succ = edge->getDstNode();
+	    out << "  Node" << node->getId() << " -> Node" << succ->getId() << ";\n";
+            if (visited.insert(succ).second) {
+                worklist.push(succ);
+            }
+        }
+    }
+
+    out << "}\n";
+    out2 << "\n";
+    out.close();
+    out2.close();
+}
 
 /*!
  * Create SVFG
@@ -55,6 +103,37 @@ SVFG* SVFGBuilder::buildFullSVFG(BVDataPTAImpl* pta)
 void SVFGBuilder::buildSVFG()
 {
     svfg->buildSVFG();
+    
+    for (auto it = svfg->begin(); it != svfg->end(); ++it) {
+        SVFGNode* node = it->second;
+        const SVFVar* svfVar = node->getValue();
+        if (!svfVar) continue;
+
+        std::string varStr = svfVar->valueOnlyToString();
+	std::string trim_varStr = trim(varStr);
+	//SVFUtil::outs() << "[DEBUG] Value extracted from SVF value : " << trim_varStr << "\n";
+        if (secretAnnotatedVals.count(trim_varStr) && node->getNodeKind() == 43) {
+            SVFUtil::outs() << "[SecretNode] Match found: Node Kind=" << node->getNodeKind() << "\nNode Id=" <<node->getId()
+                            << "\n  ==> " << trim_varStr << "\n";
+	    targetNode = node;
+        }
+	/*
+	SVFUtil::outs() << "[Compare] trim_varStr : [" << trim_varStr << "]\n";
+	for(const auto& secret : secretAnnotatedVals){
+		SVFUtil::outs() << "[Compare] secret : [" << secret << "]\n";
+		SVFUtil::outs() << (trim_varStr == secret ? "Match" : "Nope") << "\n";
+    	}
+	*/
+    }
+    if (targetNode) {
+        std::string outDotFile = "subgraph_from_secret_node.dot";
+        dumpSubgraphFromNode(targetNode, outDotFile);
+        SVFUtil::outs() << "[Subgraph] Dumped reachable subgraph from Node " << targetNode->getId()
+                        << " to " << outDotFile << "\n";
+    } else {
+        SVFUtil::outs() << "[Subgraph] No secret target node found; nothing dumped.\n";
+    }
+//kbkang-MODIFIED
 }
 
 /// Create DDA SVFG
@@ -78,8 +157,10 @@ SVFG* SVFGBuilder::build(BVDataPTAImpl* pta, VFG::VFGK kind)
     if (svfg->getMSSA()->getPTA()->printStat())
         svfg->performStat();
 
-    if (Options::DumpVFG())
+    if (Options::DumpVFG()){
         svfg->dump("svfg_final");
+	//svfg->dump_filtered("filtered_svfg",targetNode);
+    }
 
     return svfg.get();
 }
@@ -100,7 +181,7 @@ std::unique_ptr<MemSSA> SVFGBuilder::buildMSSA(BVDataPTAImpl* pta,
 
     auto mssa = std::make_unique<MemSSA>(pta, ptrOnlyMSSA);
 
-    const CallGraph* svfirCallGraph = PAG::getPAG()->getCallGraph();
+    CallGraph* svfirCallGraph = PAG::getPAG()->getCallGraph();
     for (const auto& item : *svfirCallGraph)
     {
 

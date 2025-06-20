@@ -42,7 +42,7 @@
 #include "WPA/VersionedFlowSensitive.h"
 #include "WPA/TypeAnalysis.h"
 #include "WPA/Steensgaard.h"
-
+#include "SVF-LLVM/LLVMModule.h"
 using namespace SVF;
 
 char WPAPass::ID = 0;
@@ -81,6 +81,7 @@ void WPAPass::runOnModule(SVFIR* pag)
  */
 void WPAPass::runPointerAnalysis(SVFIR* pag, u32_t kind)
 {
+    SVFUtil::outs() << "[DEBUG] entered WPAPass::runPointerAnalysis()\n";
     /// Initialize pointer analysis.
     switch (kind)
     {
@@ -118,6 +119,14 @@ void WPAPass::runPointerAnalysis(SVFIR* pag, u32_t kind)
     if (Options::AnderSVFG())
     {
         SVFGBuilder memSSA(true);
+//kbkang-MODIFIED
+	const auto& secretVals = LLVMModuleSet::getLLVMModuleSet()->getSecretValues();
+	for(const auto& s : secretVals){
+	    SVFUtil::outs() << "[DEBUG] Secret Value received : " << s << "\n";
+	}
+	memSSA.setSecretAnnotatedValues(secretVals);
+//kbkang-MODIFIED
+
         assert(SVFUtil::isa<AndersenBase>(_pta) && "supports only andersen/steensgaard for pre-computed SVFG");
         SVFG *svfg = memSSA.buildFullSVFG((BVDataPTAImpl*)_pta);
         /// support mod-ref queries only for -ander

@@ -169,6 +169,8 @@ void LLVMModuleSet::build()
 
     createSVFDataStructure();
 
+    SVFUtil::outs() << "Conversion Starts\n";
+    SVFUtil::outs() << "Conversion Ends\n";
 }
 
 void LLVMModuleSet::createSVFDataStructure()
@@ -578,6 +580,48 @@ void LLVMModuleSet::addSVFMain()
     }
 }
 
+//kbkang-MODIFIED
+void LLVMModuleSet::collectVarAnnotations(const Module* mod) {
+    for (const Function &F : *mod) {
+        for (const BasicBlock &BB : F) {
+            for (const Instruction &I : BB) {
+                const CallInst *CI = SVFUtil::dyn_cast<CallInst>(&I);
+                if (!CI || !CI->getCalledFunction()) continue;
+
+                const Function *called = CI->getCalledFunction();
+                if (!called->getName().startswith("llvm.var.annotation")) continue;
+
+                const llvm::Value *annotatedVal = CI->getArgOperand(0);
+                const llvm::Value *annotationOp = CI->getArgOperand(1)->stripPointerCasts();
+
+                if (const GlobalVariable *GV = SVFUtil::dyn_cast<GlobalVariable>(annotationOp)) {
+                    if (!GV->hasInitializer()) continue;
+
+                    if (const ConstantDataArray *CA = SVFUtil::dyn_cast<ConstantDataArray>(GV->getInitializer())) {
+                        if (CA->isString()) {
+                            std::string annotation = CA->getAsCString().str();
+                            if (annotation == "secret") {
+				std::string str;
+                                llvm::raw_string_ostream rso(str);
+                                annotatedVal->print(rso);
+                                rso.flush();
+                                SVFUtil::outs() << "[SecretAnnotation] Found: " << str << "\n";
+				SVFUtil::outs() << "[SecretAnnotation] Ptr  : " << annotatedVal << "\n";
+				std::string trim_str = trim(str);
+				SecretAnnotatedValues.insert(trim_str);  // user Defined set
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    SVFUtil::outs() << "[SecretAnnotation] Total collected = " << SecretAnnotatedValues.size() << "\n";
+    for (const auto& s : SecretAnnotatedValues) {
+        SVFUtil::outs() << "[SecretAnnotation]   => " << s << "\n";
+    }
+}
+//kbkang-MODIFIED
 void LLVMModuleSet::collectExtFunAnnotations(const Module* mod)
 {
     GlobalVariable *glob = mod->getGlobalVariable("llvm.global.annotations");
@@ -656,7 +700,9 @@ void LLVMModuleSet::buildFunToFunMap()
 
     for (Module& mod : modules)
     {
-        // extapi.bc functions
+	collectVarAnnotations(&mod);
+    
+	    // extapi.bc functions
         if (mod.getName().str() == ExtAPI::getExtAPI()->getExtBcPath())
         {
             collectExtFunAnnotations(&mod);
