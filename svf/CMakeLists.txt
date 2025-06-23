@@ -1,6 +1,9 @@
 # Define the core library
 add_library(SvfCore)
 
+set(LLVM_INCLUDE_DIR /home/SVF-tools/SVF/llvm-16.0.0.obj/include)
+
+
 # Inherit compiler & linker options by publically linking against the interface library
 target_link_libraries(SvfCore PUBLIC SvfFlags)
 
@@ -16,7 +19,15 @@ target_sources(
 )
 
 # Only expose the headers in the source tree to in-tree users of SVF
-target_include_directories(SvfCore PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>)
+target_include_directories(SvfCore PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>
+    #kbkang-MODIFIED
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/svf-llvm/include>
+    $<BUILD_INTERFACE:${LLVM_INCLUDE_DIR}>
+    #kbkang-MODIFIED
+)
+
+
 
 # Set the library & .so version of the core library
 set_target_properties(SvfCore PROPERTIES VERSION ${SVF_VERSION} SOVERSION ${SVF_VERSION_MAJOR})

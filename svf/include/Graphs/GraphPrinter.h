@@ -71,6 +71,27 @@ public:
         WriteGraph(outFile, GT, simple);
         outFile.close();
     }
+/*
+    template <typename GraphType>
+    static void WriteGraphFilteredToFile(SVF::OutStream &O,
+                               const std::string &GraphName,
+                               const GraphType &GT,
+                               const SVFGNode *StartNode)
+    {
+    	std::string Filename = GraphName + ".dot";
+	std::ofstream outFile(Filename);
+	if (outFile.fail()) 
+	{
+            O << " error opening file for writing!\n";
+	    outFile.close();
+    	    return;
+    	}
+
+	O << "Writing '" << Filename << "'...\n";
+	WriteGraphFilteredFromRoot(outFile, GT, StartNode);  // 
+	outFile.close();
+    }
+*/
 
     /*!
      * Print the graph to command line

@@ -33,7 +33,10 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
-
+#include <queue>
+#include "llvm/ADT/GraphTraits.h"
+#include "llvm/Support/raw_ostream.h"
+#include <unordered_set>
 namespace SVF
 {
 
@@ -374,7 +377,40 @@ void ViewGraph(const GraphType &G,const std::string& name,
 {
     SVF::WriteGraph(G, ShortNames);
 }
+/*
+template <typename GraphType>
+void WriteGraphFilteredFromRoot(std::ostream &O, const GraphType &G, const SVFGNode *StartNode){
+    std::unordered_set<const SVFGNode *> visited;
+    std::queue<const SVFGNode *> Q;
 
+    Q.push(StartNode);
+    visited.insert(StartNode);
+
+    // header
+    O << "digraph \"FilteredSVFG\" {\n";
+
+    // traverse and emit nodes + edges
+    while (!Q.empty()) {
+        const SVFGNode *node = Q.front();
+        Q.pop();
+
+        // print node label
+        O << "\tNode" << node->getId() << " [label=\"Node" << node->getId() << "\"];\n";
+
+        for (auto it = node->begin(), end = node->end(); it != end; ++it) {
+            const SVFGNode *succ = (*it)->getDstNode();
+            O << "\tNode" << node->getId() << " -> Node" << succ->getId() << ";\n";
+
+            if (visited.insert(succ).second)
+                Q.push(succ);
+        }
+    }
+
+    // footer
+    O << "}\n";
+}
+
+*/
 } // end namespace llvm
 
 #endif // LLVM_SUPPORT_GRAPHWRITER_H
