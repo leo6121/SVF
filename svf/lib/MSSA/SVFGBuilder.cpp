@@ -64,6 +64,19 @@ std::string escapeDotString(const std::string& raw) {
     return escaped;
 }
 
+//yshwang
+std::string trim_debug(const std::string& raw){
+    auto pos = raw.find('{');
+    std::string trimmed;
+    if (pos == std::string::npos) {
+        trimmed = raw; // No '{' found, use the whole string
+    } else {
+        trimmed = raw.substr(0, pos);
+    }
+    return trimmed;
+
+}
+
 void SVFGBuilder::dumpSubgraphFromNode(SVFGNode* startNode, const std::string& outFile) {
     std::set<const SVFGNode*> visited;
     std::queue<const SVFGNode*> worklist;
@@ -75,16 +88,52 @@ void SVFGBuilder::dumpSubgraphFromNode(SVFGNode* startNode, const std::string& o
     std::ofstream out2(outFile2);
     out << "digraph SVFG_Subgraph {\n";
 
+    // int kind;
+
     while (!worklist.empty()) {
         const SVFGNode* node = worklist.front();
         worklist.pop();
 
-	out << "  Node" << node->getId() << " [label=\"" << escapeDotString(node->toString()) << "\"];\n";
-	out2 << "  Node" << node->getId() << "\t" << escapeDotString(node->toString()) << "\n";
+        // if(PHIVFGNode::classof(node) || MSSAPHISVFGNode::classof(node)){ 
+        //     kind = node->getNodeKind();
+        //     switch(kind) 
+        //     {
+        //     // NodeKind 48,49,50 are for PHIVFGNode(specifically, TPhi, TIntraPhi, TInterPhi)
+        //     case 48: // TPhi
+        //         out << "  Node" << node->getId() << " [label=PHINode];\n";
+        //         break;
+        //     case 49: // TIntraPhi
+        //         out << "  Node" << node->getId() << " [label=IntraPHINode];\n";
+        //         break;
+        //     case 50: // TInterPhi
+        //         out << "  Node" << node->getId() << " [label=InterPHINode];\n";
+        //         break;
+
+        //     // NodeKind 55,56,57 are for MSSAPHISVFGNode(specifically, MPhi, MIntraPhi, MInterPhi)
+        //     case 55: // Phi
+        //         out << "  Node" << node->getId() << " [label=MPHINode];\n";
+        //         break;
+        //     case 56: // MIntraPhi
+        //         out << "  Node" << node->getId() << " [label=MIntraPHINode];\n";
+        //         break;
+        //     case 57: // MInterPhi
+        //         out << "  Node" << node->getId() << " [label=MInterPHINode];\n";
+        //         break;
+        //     default:
+        //         out << "  Node" << node->getId() << " isPHIVFGNodeKinds or is MSSAPHISVFGNodebut, not handled: " << kind << "\n";
+        //         break;
+        //     }
+        // }
+        // else{
+        //     out << "  Node" << node->getId() << " [label=\"" << escapeDotString(node->toString()) << "\"];\n";
+        // }
+
+        out << "  Node" << node->getId() << " [label=\"" << escapeDotString(node->toString()) << "\"];\n";
+        out2 << "  Node" << node->getId() << "\t" << escapeDotString(node->toString()) << "\n";
 
         for (const SVFGEdge* edge : node->getOutEdges()) {
             const SVFGNode* succ = edge->getDstNode();
-	    out << "  Node" << node->getId() << " -> Node" << succ->getId() << ";\n";
+	        out << "  Node" << node->getId() << " -> Node" << succ->getId() << ";\n";
             if (visited.insert(succ).second) {
                 worklist.push(succ);
             }
@@ -108,23 +157,25 @@ void SVFGBuilder::buildSVFG()
         SVFGNode* node = it->second;
         const SVFVar* svfVar = node->getValue();
         if (!svfVar) continue;
-
-        std::string varStr = svfVar->valueOnlyToString();
-	std::string trim_varStr = trim(varStr);
-	//SVFUtil::outs() << "[DEBUG] Value extracted from SVF value : " << trim_varStr << "\n";
-        if (secretAnnotatedVals.count(trim_varStr) && node->getNodeKind() == 43) {
-            SVFUtil::outs() << "[SecretNode] Match found: Node Kind=" << node->getNodeKind() << "\nNode Id=" <<node->getId()
-                            << "\n  ==> " << trim_varStr << "\n";
-	    targetNode = node;
+        
+        if(!SVFUtil::isa<GepObjVar>(svfVar) && !SVFUtil::isa<GepValVar>(svfVar) && !SVFUtil::isa<DummyObjVar>(svfVar) 
+        && !SVFUtil::isa<DummyValVar>(svfVar) && !SVFUtil::isa<BlackHoleValVar>(svfVar)){
+            std::string varStr = svfVar->valueOnlyToString();
+            std::string trim_varStr = trim(trim_debug(varStr));
+            // SVFUtil::outs() << "[DEBUG] Value extracted from SVF value : " << trim_varStr << "\n";
+            if (secretAnnotatedVals.count(trim_varStr) && node->getNodeKind() == 43) { // Node number 43 is for AddrVFGNode
+                SVFUtil::outs() << "[SecretNode] Match found: Node Kind=" << node->getNodeKind() << "\nNode Id=" <<node->getId()
+                << "\n  ==> " << trim_varStr << "\n";
+                targetNode = node;
+            }
+            // SVFUtil::outs() << "[Compare] trim_varStr : [" << trim_varStr << "]\n";
+            // for(const auto& secret : secretAnnotatedVals){
+            //     SVFUtil::outs() << "[Compare] secret : [" << secret << "]\n";
+            //     SVFUtil::outs() << (trim_varStr == secret ? "Match" : "Nope") << "\n";
+            // }
         }
-	/*
-	SVFUtil::outs() << "[Compare] trim_varStr : [" << trim_varStr << "]\n";
-	for(const auto& secret : secretAnnotatedVals){
-		SVFUtil::outs() << "[Compare] secret : [" << secret << "]\n";
-		SVFUtil::outs() << (trim_varStr == secret ? "Match" : "Nope") << "\n";
-    	}
-	*/
     }
+    
     if (targetNode) {
         std::string outDotFile = "subgraph_from_secret_node.dot";
         dumpSubgraphFromNode(targetNode, outDotFile);
@@ -181,7 +232,7 @@ std::unique_ptr<MemSSA> SVFGBuilder::buildMSSA(BVDataPTAImpl* pta,
 
     auto mssa = std::make_unique<MemSSA>(pta, ptrOnlyMSSA);
 
-    CallGraph* svfirCallGraph = PAG::getPAG()->getCallGraph();
+    const CallGraph* svfirCallGraph = PAG::getPAG()->getCallGraph();
     for (const auto& item : *svfirCallGraph)
     {
 
